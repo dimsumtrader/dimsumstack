@@ -125,6 +125,8 @@ def scan_dex(dex, wanted_classes, min_oi_usd: float) -> list:
 def get_assets(asset_classes, min_oi_usd: float) -> list:
     """Collect qualifying markets across dexes for the requested classes."""
     wanted = set(asset_classes)
+    if 'all' in wanted:
+        wanted = {'crypto', 'equity', 'commodity', 'fx', 'other'}
     markets = []
     if 'crypto' in wanted:
         markets += scan_dex(None, {'crypto'}, min_oi_usd)
@@ -166,7 +168,7 @@ def fetch_funding_history(coin: str, start_time_ms: int, page_size: int = 500) -
 
     return all_records
 
-def aggregate_funding_to_master_csv(asset_class: str, days_ago: int, min_oi_usd: float, filename: str):
+def aggregate_funding_to_master_csv(asset_class: str, days_ago: int, min_oi_usd: float, filename: str, coins: str = None):
     """
     Loops through the selected markets, aggregates their historical hourly funding,
     and saves them out into a single master file for intraday macro analysis.
@@ -175,6 +177,15 @@ def aggregate_funding_to_master_csv(asset_class: str, days_ago: int, min_oi_usd:
     if not target_markets:
         print(f"No markets matched asset class '{asset_class}' at your threshold of ${min_oi_usd:,.0f} USD Open Interest.")
         return
+
+    # Optional: narrow to specific markets named by ticker (BTC) or full name (xyz:AAPL).
+    if coins:
+        wanted = {c.strip().upper() for c in coins.split(',')}
+        target_markets = [(n, oi, c) for (n, oi, c) in target_markets
+                          if n.upper() in wanted or n.split(':')[-1].upper() in wanted]
+        if not target_markets:
+            print(f"No markets in '{asset_class}' matched --coins '{coins}'.")
+            return
 
     print(f"Found {len(target_markets)} '{asset_class}' markets with Open Interest over ${min_oi_usd:,.0f}!")
 
@@ -246,8 +257,12 @@ def main():
                         help="which markets to include (default: equity)")
     parser.add_argument("--days", type=int, default=30,
                         help="lookback window in days from now (default: 30)")
-    parser.add_argument("--min-oi-usd", type=float, default=10_000_000,
-                        help="minimum open interest in USD to include a market (default: 10,000,000)")
+    parser.add_argument("--min-oi-usd", type=float, default=None,
+                        help="minimum open interest in USD to include a market "
+                             "(default: 10,000,000; treated as 0 when --coins is given)")
+    parser.add_argument("--coins", default=None,
+                        help="comma-separated specific markets to include, by ticker "
+                             "or full name (e.g. BTC or xyz:AAPL); skips the OI floor")
     parser.add_argument("--output", default=None,
                         help="destination CSV path, overwritten each run "
                              "(default: hl_<asset-class>_funding.csv)")
@@ -257,8 +272,12 @@ def main():
     if not filename:
         filename = f"hl_{args.asset_class}_funding.csv"
 
+    min_oi = args.min_oi_usd
+    if min_oi is None:
+        min_oi = 0 if args.coins else 10_000_000
+
     aggregate_funding_to_master_csv(asset_class=args.asset_class, days_ago=args.days,
-                                    min_oi_usd=args.min_oi_usd, filename=filename)
+                                    min_oi_usd=min_oi, filename=filename, coins=args.coins)
 
 if __name__ == "__main__":
     main()

@@ -25,11 +25,17 @@ directly:
 python scripts/hype_funding_rate.py --asset-class equity --days 30 --min-oi-usd 10000000
 ```
 
+If `uv` is not on PATH — common in fresh shells, since uv installs to
+`~/.local/bin` by default — invoke it by absolute path (Windows:
+`%USERPROFILE%\.local\bin\uv.exe run ...`, macOS/Linux:
+`~/.local/bin/uv run ...`) or prepend that directory to PATH first.
+
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `--asset-class` | `equity` | Which markets to include — see table below. |
 | `--days` | `30` | Lookback window in days, counting back from now (UTC). |
-| `--min-oi-usd` | `10000000` | Keep only markets whose open interest (OI x mark price) clears this USD floor. |
+| `--min-oi-usd` | `10000000` | Keep only markets whose open interest (OI x mark price) clears this USD floor. Treated as 0 when `--coins` is given. |
+| `--coins` | (none) | Comma-separated specific markets to include, by ticker or full name (`--coins BTC` or `--coins xyz:AAPL,AAPL`); skips the OI floor. |
 | `--output` | derived | Destination CSV; overwritten each run. Defaults to `hl_<asset-class>_funding.csv` (e.g. `hl_equity_funding.csv`). |
 
 Asset classes:
@@ -48,6 +54,10 @@ last week, $500M+ OI only" becomes `--asset-class crypto --days 7
 --min-oi-usd 500000000`. Any parameter the user doesn't specify takes the
 default above; if the user doesn't name an asset class, ask which they want
 unless context makes it obvious.
+
+For single-market asks ("pull BTC funding", "funding for xyz:AAPL"), use
+`--coins BTC` / `--coins AAPL` — it fetches just those markets instead of
+the whole class, so prefer it over fetch-everything-then-filter.
 
 Class boundaries live in the ticker sets at the top of the script
 (`FX_TICKERS`, `COMMODITY_TICKERS`, `OTHER_TICKERS`). Note `xyz:CL` is WTI
